@@ -4,3 +4,6 @@ google-generativeai>=0.3.0  # 用于 Gemini API
 
 # 工具依赖
 python-dotenv>=1.0.0   # 用于环境变量管理（可选） 
+
+# 日志相关
+python-json-logger>=2.0.0  # 可选，用于JSON格式日志 

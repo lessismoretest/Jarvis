@@ -6,6 +6,10 @@ Jarvis - 个人智能助手系统
 """
 from config import DEFAULT_AI_MODEL
 from ai_models import DeepseekAI, GeminiAI
+from utils.logger import setup_logger
+
+# 创建logger实例
+logger = setup_logger(__name__)
 
 class Jarvis:
     def __init__(self, ai_model: str = DEFAULT_AI_MODEL):
@@ -16,7 +20,9 @@ class Jarvis:
             ai_model: 选择使用的AI模型 ('deepseek' 或 'gemini')
         """
         self.name = "Jarvis"
+        logger.info(f"正在初始化 Jarvis，使用 {ai_model} 模型")
         self.ai_model = self._initialize_ai_model(ai_model)
+        logger.info("Jarvis 初始化完成")
     
     def _initialize_ai_model(self, model_name: str):
         """
@@ -28,16 +34,24 @@ class Jarvis:
         Returns:
             BaseAIModel: AI模型实例
         """
-        if model_name == "deepseek":
-            return DeepseekAI()
-        elif model_name == "gemini":
-            return GeminiAI()
-        else:
-            raise ValueError(f"不支持的AI模型: {model_name}")
+        try:
+            if model_name == "deepseek":
+                return DeepseekAI()
+            elif model_name == "gemini":
+                return GeminiAI()
+            else:
+                error_msg = f"不支持的AI模型: {model_name}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+        except Exception as e:
+            logger.error(f"初始化AI模型时出错: {str(e)}")
+            raise
     
     def greet(self):
         """Jarvis 的问候语"""
-        print(f"Hello world! 我是 {self.name}, 很高兴为您服务。")
+        message = f"Hello world! 我是 {self.name}, 很高兴为您服务。"
+        print(message)
+        logger.info("Jarvis 已启动并发送问候")
     
     def chat(self, message: str) -> str:
         """
@@ -50,26 +64,37 @@ class Jarvis:
             str: AI的回复
         """
         try:
+            logger.info(f"收到用户输入: {message}")
             response = self.ai_model.generate_response(message)
+            logger.info(f"AI响应: {response}")
             return response
         except Exception as e:
-            return f"抱歉，处理您的请求时出现错误: {str(e)}"
+            error_msg = f"处理请求时出错: {str(e)}"
+            logger.error(error_msg)
+            return f"抱歉，{error_msg}"
 
 def main():
     """主程序入口"""
-    # 默认使用 Deepseek
-    jarvis = Jarvis()
-    jarvis.greet()
-    
-    # 简单的对话循环
-    while True:
-        user_input = input("\n请输入您的问题 (输入 'quit' 退出): ")
-        if user_input.lower() == 'quit':
-            print("再见！")
-            break
+    try:
+        logger.info("启动 Jarvis 系统")
+        jarvis = Jarvis()
+        jarvis.greet()
         
-        response = jarvis.chat(user_input)
-        print(f"\nJarvis: {response}")
+        while True:
+            user_input = input("\n请输入您的问题 (输入 'quit' 退出): ")
+            if user_input.lower() == 'quit':
+                logger.info("用户请求退出")
+                print("再见！")
+                break
+            
+            response = jarvis.chat(user_input)
+            print(f"\nJarvis: {response}")
+            
+    except Exception as e:
+        logger.error(f"系统运行时出错: {str(e)}")
+        raise
+    finally:
+        logger.info("Jarvis 系统已关闭")
 
 if __name__ == "__main__":
     main() 
