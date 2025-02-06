@@ -186,6 +186,41 @@ class Jarvis:
             logger.error(f"显示统计信息失败: {str(e)}")
             print(f"\n获取统计信息失败: {str(e)}")
 
+    def continuous_chat(self, mode: str = "text"):
+        """
+        持续对话模式
+        
+        Args:
+            mode: 对话模式 ('text' 或 'voice')
+        """
+        try:
+            print("\n=== 持续对话模式 ===")
+            print("- 随时按 Ctrl+C 结束对话")
+            print("- 直接开始对话即可")
+            print("=====================")
+            
+            while True:
+                try:
+                    if mode == "text":
+                        user_input = input("\n您: ")
+                    else:  # voice mode
+                        print("\n正在听...")
+                        user_input = self.listen()
+                        
+                    if not user_input:
+                        continue
+                        
+                    response = self.chat(user_input, mode)
+                    print(f"\nJarvis: {response}")
+                    
+                except KeyboardInterrupt:
+                    print("\n\n退出持续对话模式")
+                    break
+                    
+        except Exception as e:
+            logger.error(f"持续对话模式出错: {str(e)}")
+            print(f"\n持续对话模式出错: {str(e)}")
+
 def main():
     """主程序入口"""
     try:
@@ -197,6 +232,8 @@ def main():
             print("\n=== Jarvis 命令菜单 ===")
             print("1: 文字输入")
             print("2: 语音输入")
+            print("3: 持续文字对话")
+            print("4: 持续语音对话")
             print("h: 显示历史记录")
             print("s: 显示统计信息")
             print("c: 清除历史记录")
@@ -225,21 +262,25 @@ def main():
             if choice == '1':
                 user_input = input("\n请输入您的问题: ")
                 input_type = "text"
+                if user_input:
+                    response = jarvis.chat(user_input, input_type)
+                    print(f"\nJarvis: {response}")
             elif choice == '2':
                 user_input = jarvis.listen()
                 input_type = "voice"
                 if user_input:
                     print("\n正在生成回复...")
+                    response = jarvis.chat(user_input, input_type)
+                    print(f"\nJarvis: {response}")
                 else:
                     print("未能识别语音，请重试")
-                    continue
+            elif choice == '3':
+                jarvis.continuous_chat(mode="text")
+            elif choice == '4':
+                jarvis.continuous_chat(mode="voice")
             else:
                 print("无效的选择，请重试")
                 continue
-            
-            if user_input:
-                response = jarvis.chat(user_input, input_type)
-                print(f"\nJarvis: {response}")
             
     except Exception as e:
         logger.error(f"系统运行时出错: {str(e)}")
