@@ -1,0 +1,6 @@
+# AI模型依赖
+openai>=1.0.0          # 用于 Deepseek API
+google-generativeai>=0.3.0  # 用于 Gemini API
+
+# 工具依赖
+python-dotenv>=1.0.0   # 用于环境变量管理（可选） 
