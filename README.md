@@ -2,9 +2,66 @@
 
 基于钢铁侠电影中的 J.A.R.V.I.S. (Just A Rather Very Intelligent System) 打造的智能助手系统。
 
+## 系统流程
+
+### 基本工作流程
+
+```mermaid
+flowchart TD
+    A[启动 Jarvis] --> B{选择输入方式}
+    B -->|文字输入| C[获取用户输入]
+    B -->|语音输入| D[录音5秒]
+    D --> E[Whisper语音识别]
+    E --> F[文字内容]
+    C --> F
+    F --> G[AI模型处理]
+    G --> H[生成回复]
+    H --> I[文字显示]
+    H --> J[Edge-TTS语音合成]
+    J --> K[播放语音]
+    I --> B
+    K --> B
+```
+
+### AI模型处理流程
+
+```mermaid
+flowchart LR
+    A[用户输入] --> B{选择模型}
+    B -->|Deepseek| C[Deepseek API]
+    B -->|Gemini| D[Gemini API]
+    C --> E[响应处理]
+    D --> E
+    E --> F[返回结果]
+```
+
+### 语音处理流程
+
+```mermaid
+flowchart TD
+    subgraph 语音识别
+    A[录音] --> B[保存临时文件]
+    B --> C[Whisper识别]
+    C --> D[文字结果]
+    end
+
+    subgraph 语音合成
+    E[文字输入] --> F[Edge-TTS处理]
+    F --> G[生成音频]
+    G --> H[播放]
+    end
+
+    D --> E
+    H --> I[清理临时文件]
+```
+
 ## 功能特点
 
 - 多AI模型支持（Deepseek和Gemini）
+- 语音交互功能
+  - 语音识别（Whisper）
+  - 语音合成（Edge-TTS）
+  - 多种声音选项
 - 模块化设计
 - 完整的日志系统
 - 安全的配置管理
@@ -33,7 +90,19 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ~~~
 
-4. 配置环境变量：
+4. 安装系统依赖：
+~~~bash
+# Mac
+brew install ffmpeg portaudio
+
+# Linux
+sudo apt-get install ffmpeg portaudio19-dev python3-pyaudio
+
+# Windows
+# 通常无需额外安装
+~~~
+
+5. 配置环境变量：
    - 复制 `.env.example` 为 `.env`
    - 在 `.env` 中填入你的API密钥：
 ~~~ini
@@ -49,14 +118,21 @@ GEMINI_API_KEY=your_gemini_api_key_here
 python jarvis.py
 ~~~
 
-2. 与Jarvis交互：
-   - 输入问题进行对话
-   - 输入 'quit' 退出程序
+2. 选择交互方式：
+   - 1: 文字输入
+   - 2: 语音输入（5秒录音）
+   - q: 退出程序
 
-3. 切换AI模型：
+3. 语音设置：
 ~~~python
-# 在代码中指定模型
+# 切换AI模型
 jarvis = Jarvis(ai_model="gemini")  # 或 "deepseek"
+
+# 切换语音（可用的中文语音）
+jarvis.speech_synthesizer = EdgeTTSSynthesizer(voice="zh-CN-XiaoxiaoNeural")  # 默认女声
+jarvis.speech_synthesizer = EdgeTTSSynthesizer(voice="zh-CN-YunxiNeural")     # 男声
+jarvis.speech_synthesizer = EdgeTTSSynthesizer(voice="zh-CN-YunyangNeural")   # 男声，新闻播报风格
+jarvis.speech_synthesizer = EdgeTTSSynthesizer(voice="zh-CN-XiaochenNeural")  # 女声，温柔风格
 ~~~
 
 ## 项目结构
@@ -64,6 +140,11 @@ jarvis = Jarvis(ai_model="gemini")  # 或 "deepseek"
 ~~~
 jarvis/
 ├── logs/           # 日志文件目录
+├── temp/           # 临时音频文件目录
+├── speech/         # 语音处理模块
+│   ├── __init__.py
+│   ├── recognizer.py   # 语音识别
+│   └── synthesizer.py  # 语音合成
 ├── utils/
 │   ├── __init__.py
 │   └── logger.py   # 日志配置
@@ -73,6 +154,20 @@ jarvis/
 ├── requirements.txt
 └── README.md
 ~~~
+
+## 语音功能
+
+### 语音识别
+- 使用OpenAI的Whisper模型
+- 支持实时录音
+- 自动管理临时文件
+- 支持多种语言
+
+### 语音合成
+- 使用Microsoft Edge TTS
+- 多种声音选项
+- 高质量语音输出
+- 无需API密钥
 
 ## 日志系统
 
@@ -101,11 +196,17 @@ jarvis/
 - 请勿将 `.env` 文件提交到版本控制系统
 - 建议定期检查和清理日志文件
 - API密钥请妥善保管，不要泄露
+- 临时音频文件会自动清理
+- 确保系统音量适中
 
 ## 依赖列表
 
 - openai: Deepseek API 客户端
 - google-generativeai: Gemini API 客户端
+- openai-whisper: 语音识别
+- edge-tts: 语音合成
+- sounddevice: 录音支持
+- soundfile: 音频处理
 - python-dotenv: 环境变量管理
 - python-json-logger: JSON格式日志支持
 

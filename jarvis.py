@@ -10,6 +10,9 @@ from ai_models import DeepseekAI, GeminiAI
 from speech.recognizer import WhisperRecognizer
 from speech.synthesizer import EdgeTTSSynthesizer
 from utils.logger import setup_logger
+from utils.database import Database
+import uuid
+import time
 
 # 创建logger实例
 logger = setup_logger(__name__)
@@ -27,6 +30,8 @@ class Jarvis:
         self.ai_model = self._initialize_ai_model(ai_model)
         self.speech_recognizer = WhisperRecognizer()
         self.speech_synthesizer = EdgeTTSSynthesizer()
+        self.db = Database()
+        self.session_id = str(uuid.uuid4())  # 为每次运行创建唯一会话ID
         logger.info("Jarvis 初始化完成")
     
     def _initialize_ai_model(self, model_name: str):
@@ -78,45 +83,108 @@ class Jarvis:
         except Exception as e:
             logger.error(f"语音播放失败: {str(e)}")
     
-    def chat(self, message: str) -> str:
+    def chat(self, message: str, input_type: str = "text") -> str:
         """
-        与AI模型对话
+        与AI模型对话并保存记录
         
         Args:
             message: 用户输入的消息
-            
-        Returns:
-            str: AI的回复
+            input_type: 输入类型 ('text' 或 'voice')
         """
         try:
             logger.info(f"收到用户输入: {message}")
+            start_time = time.time()
+            
             response = self.ai_model.generate_response(message)
+            
+            # 计算响应时间
+            response_time = time.time() - start_time
+            
+            # 保存对话记录
+            self.db.save_chat(
+                session_id=self.session_id,
+                input_type=input_type,
+                user_input=message,
+                ai_response=response,
+                model_used=self.ai_model.__class__.__name__,
+                response_time=response_time
+            )
+            
             logger.info(f"AI响应: {response}")
             # 添加语音输出
             self.speak(response)
             return response
+            
         except Exception as e:
             error_msg = f"处理请求时出错: {str(e)}"
             logger.error(error_msg)
             return f"抱歉，{error_msg}"
 
-    def listen(self, duration: int = 5) -> str:
+    def listen(self) -> str:
         """
-        监听用户语音输入
+        监听用户语音输入并实时识别
         
-        Args:
-            duration: 录音时长（秒）
-            
         Returns:
-            str: 识别出的文字
+            str: 完整的识别文字
         """
         try:
-            audio_path = self.speech_recognizer.record_audio(duration)
-            text = self.speech_recognizer.transcribe_audio(audio_path)
-            return text
+            print("\n=== 语音输入模式 ===")
+            print("- 开始说话后自动检测")
+            print("- 停顿5秒后自动结束")
+            print("- 按Ctrl+C可手动结束")
+            print("- 实时显示识别结果")
+            print("========================")
+            
+            text = self.speech_recognizer.record_and_transcribe()
+            if text:
+                print("\n完整识别结果:", text)
+                return text
+            return ""
+        except ValueError as e:
+            logger.warning(str(e))
+            return ""
         except Exception as e:
             logger.error(f"语音识别失败: {str(e)}")
             return ""
+
+    def show_history(self, limit: int = 10):
+        """显示最近的对话历史"""
+        try:
+            history = self.db.get_chat_history(limit=limit)
+            if not history:
+                print("\n暂无对话记录")
+                return
+            
+            print("\n=== 最近对话记录 ===")
+            for record in history:
+                print(f"\n时间: {record['timestamp']}")
+                print(f"输入类型: {record['input_type']}")
+                print(f"用户: {record['user_input']}")
+                print(f"Jarvis: {record['ai_response']}")
+                print(f"响应时间: {record['response_time']:.2f}秒")
+                print("-" * 50)
+        
+        except Exception as e:
+            logger.error(f"显示对话记录失败: {str(e)}")
+            print(f"\n获取对话记录失败: {str(e)}")
+
+    def show_stats(self):
+        """显示统计信息"""
+        try:
+            stats = self.db.get_session_stats()
+            print("\n=== 统计信息 ===")
+            print(f"总对话数: {stats['total']}")
+            print("\n输入类型分布:")
+            for type_, count in stats['input_types'].items():
+                print(f"- {type_}: {count}")
+            print(f"\n平均响应时间: {stats['avg_response_time']:.2f}秒")
+            print("\n模型使用统计:")
+            for model, count in stats['models'].items():
+                print(f"- {model}: {count}")
+        
+        except Exception as e:
+            logger.error(f"显示统计信息失败: {str(e)}")
+            print(f"\n获取统计信息失败: {str(e)}")
 
 def main():
     """主程序入口"""
@@ -126,25 +194,51 @@ def main():
         jarvis.greet()
         
         while True:
-            choice = input("\n选择输入方式 (1: 文字, 2: 语音, q: 退出): ")
+            print("\n=== Jarvis 命令菜单 ===")
+            print("1: 文字输入")
+            print("2: 语音输入")
+            print("h: 显示历史记录")
+            print("s: 显示统计信息")
+            print("c: 清除历史记录")
+            print("q: 退出")
+            print("=====================")
             
-            if choice.lower() == 'q':
+            choice = input("\n请选择: ").lower()
+            
+            if choice == 'q':
                 logger.info("用户请求退出")
                 print("再见！")
                 break
+            elif choice == 'h':
+                jarvis.show_history()
+                continue
+            elif choice == 's':
+                jarvis.show_stats()
+                continue
+            elif choice == 'c':
+                confirm = input("确定要清除所有历史记录吗？(y/n): ").lower()
+                if confirm == 'y':
+                    jarvis.db.clear_history()
+                    print("历史记录已清除")
+                continue
             
             if choice == '1':
                 user_input = input("\n请输入您的问题: ")
+                input_type = "text"
             elif choice == '2':
-                print("\n请说话（5秒）...")
                 user_input = jarvis.listen()
-                print(f"识别结果: {user_input}")
+                input_type = "voice"
+                if user_input:
+                    print("\n正在生成回复...")
+                else:
+                    print("未能识别语音，请重试")
+                    continue
             else:
                 print("无效的选择，请重试")
                 continue
             
             if user_input:
-                response = jarvis.chat(user_input)
+                response = jarvis.chat(user_input, input_type)
                 print(f"\nJarvis: {response}")
             
     except Exception as e:

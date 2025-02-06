@@ -2,7 +2,7 @@
 AI模型模块 - 处理与不同AI模型的交互
 """
 from abc import ABC, abstractmethod
-import google.generativeai as genai
+import google.generativeai as genai 
 from openai import OpenAI
 from config import AI_CONFIG
 from utils.logger import setup_logger
@@ -42,9 +42,23 @@ class DeepseekAI(BaseAIModel):
             logger.debug(f"向Deepseek发送请求: {prompt}")
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[{"role": "user", "content": prompt}]
+                messages=[
+                    {"role": "system", "content": "你是一个智能助手，请用简洁友好的方式回答问题。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+                stream=False
             )
-            return response.choices[0].message.content
+            
+            # 添加错误处理和日志
+            if not response or not response.choices:
+                raise ValueError("API返回空响应")
+            
+            result = response.choices[0].message.content.strip()
+            logger.debug(f"Deepseek响应: {result}")
+            return result
+            
         except Exception as e:
             logger.error(f"Deepseek API调用失败: {str(e)}")
             raise
@@ -62,14 +76,63 @@ class GeminiAI(BaseAIModel):
         
         logger.info("初始化 Gemini 客户端")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
     
     def generate_response(self, prompt: str) -> str:
-        """使用Gemini生成回复"""
+        """使用Gemini生成回复（流式输出）"""
         try:
             logger.debug(f"向Gemini发送请求: {prompt}")
-            response = self.model.generate_content(prompt)
-            return response.text
+            
+            generation_config = {
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 2048,
+            }
+            
+            safety_settings = [
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_NONE",
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
+                    "threshold": "BLOCK_NONE",
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_NONE",
+                },
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_NONE",
+                },
+            ]
+            
+            # 使用流式生成
+            response_stream = self.model.generate_content(
+                prompt,
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+                stream=True  # 启用流式输出
+            )
+            
+            # 收集并显示流式响应
+            full_response = []
+            print("\nJarvis: ", end="", flush=True)
+            
+            for chunk in response_stream:
+                if chunk.text:
+                    print(chunk.text, end="", flush=True)
+                    full_response.append(chunk.text)
+            
+            print()  # 换行
+            
+            # 合并所有响应
+            result = "".join(full_response).strip()
+            logger.debug(f"Gemini响应: {result}")
+            return result
+            
         except Exception as e:
             logger.error(f"Gemini API调用失败: {str(e)}")
             raise 

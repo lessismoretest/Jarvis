@@ -18,5 +18,5 @@ AI_CONFIG = {
     }
 }
 
-# 默认设置
-DEFAULT_AI_MODEL = "deepseek" 
+# 默认使用的AI模型
+DEFAULT_AI_MODEL = "gemini" 
