@@ -13,9 +13,22 @@ from utils.logger import setup_logger
 from utils.database import Database
 import uuid
 import time
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+from rich.prompt import Prompt
+from rich.progress import Progress
+from rich.markdown import Markdown
+import threading
+import queue
+import subprocess
+from pathlib import Path
 
 # 创建logger实例
 logger = setup_logger(__name__)
+# 创建rich console实例
+console = Console()
 
 class Jarvis:
     def __init__(self, ai_model: str = DEFAULT_AI_MODEL):
@@ -32,6 +45,23 @@ class Jarvis:
         self.speech_synthesizer = EdgeTTSSynthesizer()
         self.db = Database()
         self.session_id = str(uuid.uuid4())  # 为每次运行创建唯一会话ID
+        
+        # 初始化语音合成队列和播放队列
+        self.synthesis_queue = queue.Queue()  # 待合成的文本队列
+        self.playback_queue = queue.Queue()   # 待播放的音频文件队列
+        
+        # 创建临时文件目录
+        self.temp_dir = Path("temp")
+        self.temp_dir.mkdir(exist_ok=True)
+        
+        # 启动语音合成线程
+        self.synthesis_thread = threading.Thread(target=self._synthesis_worker, daemon=True)
+        self.synthesis_thread.start()
+        
+        # 启动语音播放线程
+        self.playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
+        self.playback_thread.start()
+        
         logger.info("Jarvis 初始化完成")
     
     def _initialize_ai_model(self, model_name: str):
@@ -48,7 +78,10 @@ class Jarvis:
             if model_name == "deepseek":
                 return DeepseekAI()
             elif model_name == "gemini":
-                return GeminiAI()
+                model = GeminiAI()
+                # 设置语音合成回调
+                model.set_tts_callback(self.speak)
+                return model
             else:
                 error_msg = f"不支持的AI模型: {model_name}"
                 logger.error(error_msg)
@@ -60,28 +93,105 @@ class Jarvis:
     def greet(self):
         """Jarvis 的问候语"""
         message = f"Hello world! 我是 {self.name}, 很高兴为您服务。"
-        print(message)
+        console.print(Panel(message, style="bold green"))
         logger.info("Jarvis 已启动并发送问候")
+    
+    def _clean_markdown(self, text: str) -> str:
+        """
+        清理文本中的 Markdown 标记
+        
+        Args:
+            text: 包含 Markdown 标记的文本
+            
+        Returns:
+            str: 清理后的纯文本
+        """
+        # 移除粗体标记
+        text = text.replace('**', '')
+        # 移除斜体标记
+        text = text.replace('*', '')
+        # 移除代码块标记
+        text = text.replace('`', '')
+        # 移除列表标记
+        text = text.replace('- ', '')
+        return text
+    
+    def _synthesis_worker(self):
+        """语音合成工作线程"""
+        while True:
+            try:
+                text = self.synthesis_queue.get()
+                if text is None:  # 停止信号
+                    break
+                    
+                # 清理 Markdown 标记
+                clean_text = self._clean_markdown(text)
+                
+                # 生成唯一的音频文件名
+                audio_file = self.temp_dir / f"response_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.mp3"
+                
+                # 生成语音文件
+                self.speech_synthesizer.text_to_speech(clean_text, str(audio_file))
+                
+                # 将音频文件加入播放队列
+                self.playback_queue.put(audio_file)
+                
+            except Exception as e:
+                logger.error(f"语音合成失败: {str(e)}")
+            finally:
+                self.synthesis_queue.task_done()
+    
+    def _playback_worker(self):
+        """语音播放工作线程"""
+        while True:
+            try:
+                audio_file = self.playback_queue.get()
+                if audio_file is None:  # 停止信号
+                    break
+                
+                if not audio_file.exists():
+                    logger.error(f"音频文件不存在: {audio_file}")
+                    continue
+                
+                try:
+                    # 使用 subprocess 播放音频（不阻塞主线程）
+                    if os.name == 'posix':  # Mac/Linux
+                        subprocess.run(['afplay', str(audio_file)], check=True)
+                    else:  # Windows
+                        subprocess.run(['start', str(audio_file)], shell=True, check=True)
+                finally:
+                    # 播放完成后删除临时文件
+                    try:
+                        audio_file.unlink()
+                    except Exception as e:
+                        logger.warning(f"删除临时文件失败: {str(e)}")
+                    
+            except Exception as e:
+                logger.error(f"语音播放失败: {str(e)}")
+            finally:
+                self.playback_queue.task_done()
     
     def speak(self, text: str):
         """
-        将文字转换为语音并播放
+        将文字加入语音合成队列
         
         Args:
             text: 要说出的文字
         """
         try:
-            # 生成语音文件
-            audio_file = self.speech_synthesizer.text_to_speech(text)
-            
-            # 使用系统命令播放音频
-            if os.name == 'posix':  # Mac/Linux
-                os.system(f"afplay {audio_file}")
-            else:  # Windows
-                os.system(f"start {audio_file}")
-                
+            self.synthesis_queue.put(text)
         except Exception as e:
-            logger.error(f"语音播放失败: {str(e)}")
+            logger.error(f"添加语音合成任务失败: {str(e)}")
+    
+    def stop_speaking(self):
+        """停止语音合成和播放线程"""
+        # 发送停止信号
+        self.synthesis_queue.put(None)
+        self.playback_queue.put(None)
+        
+        # 等待线程结束
+        self.synthesis_thread.join()
+        self.playback_thread.join()
     
     def chat(self, message: str, input_type: str = "text") -> str:
         """
@@ -95,6 +205,7 @@ class Jarvis:
             logger.info(f"收到用户输入: {message}")
             start_time = time.time()
             
+            # 生成响应（AI模型内部会处理流式输出和语音合成）
             response = self.ai_model.generate_response(message)
             
             # 计算响应时间
@@ -111,8 +222,6 @@ class Jarvis:
             )
             
             logger.info(f"AI响应: {response}")
-            # 添加语音输出
-            self.speak(response)
             return response
             
         except Exception as e:
@@ -152,39 +261,60 @@ class Jarvis:
         try:
             history = self.db.get_chat_history(limit=limit)
             if not history:
-                print("\n暂无对话记录")
+                console.print("\n[yellow]暂无对话记录[/yellow]")
                 return
             
-            print("\n=== 最近对话记录 ===")
+            console.print("\n[bold cyan]最近对话记录[/bold cyan]")
+            
             for record in history:
-                print(f"\n时间: {record['timestamp']}")
-                print(f"输入类型: {record['input_type']}")
-                print(f"用户: {record['user_input']}")
-                print(f"Jarvis: {record['ai_response']}")
-                print(f"响应时间: {record['response_time']:.2f}秒")
-                print("-" * 50)
-        
+                console.print(f"\n[dim]{record['timestamp']}[/dim] ([magenta]{record['input_type']}[/magenta])")
+                console.print(f"[green]用户:[/green] {record['user_input']}")
+                console.print("[blue]Jarvis:[/blue]")
+                console.print(Markdown(record['ai_response']))
+                console.print(f"[yellow]响应时间: {record['response_time']:.2f}秒[/yellow]")
+                console.print("─" * 50)
+
         except Exception as e:
             logger.error(f"显示对话记录失败: {str(e)}")
-            print(f"\n获取对话记录失败: {str(e)}")
+            console.print(f"\n[red]获取对话记录失败: {str(e)}[/red]")
 
     def show_stats(self):
         """显示统计信息"""
         try:
             stats = self.db.get_session_stats()
-            print("\n=== 统计信息 ===")
-            print(f"总对话数: {stats['total']}")
-            print("\n输入类型分布:")
+            
+            table = Table(title="统计信息")
+            table.add_column("类别", style="cyan")
+            table.add_column("数值", style="yellow")
+            
+            table.add_row("总对话数", str(stats['total']))
+            table.add_row("平均响应时间", f"{stats['avg_response_time']:.2f}秒")
+            
+            console.print(table)
+            
+            # 输入类型分布
+            type_table = Table(title="输入类型分布")
+            type_table.add_column("类型", style="magenta")
+            type_table.add_column("数量", style="green")
+            
             for type_, count in stats['input_types'].items():
-                print(f"- {type_}: {count}")
-            print(f"\n平均响应时间: {stats['avg_response_time']:.2f}秒")
-            print("\n模型使用统计:")
+                type_table.add_row(type_, str(count))
+            
+            console.print(type_table)
+            
+            # 模型使用统计
+            model_table = Table(title="模型使用统计")
+            model_table.add_column("模型", style="blue")
+            model_table.add_column("使用次数", style="green")
+            
             for model, count in stats['models'].items():
-                print(f"- {model}: {count}")
-        
+                model_table.add_row(model, str(count))
+            
+            console.print(model_table)
+            
         except Exception as e:
             logger.error(f"显示统计信息失败: {str(e)}")
-            print(f"\n获取统计信息失败: {str(e)}")
+            console.print(f"\n[red]获取统计信息失败: {str(e)}[/red]")
 
     def continuous_chat(self, mode: str = "text"):
         """
@@ -211,7 +341,6 @@ class Jarvis:
                         continue
                         
                     response = self.chat(user_input, mode)
-                    print(f"\nJarvis: {response}")
                     
                 except KeyboardInterrupt:
                     print("\n\n退出持续对话模式")
@@ -221,30 +350,48 @@ class Jarvis:
             logger.error(f"持续对话模式出错: {str(e)}")
             print(f"\n持续对话模式出错: {str(e)}")
 
+    def cleanup(self):
+        """清理资源"""
+        try:
+            # 停止语音线程
+            self.stop_speaking()
+            
+            # 清理临时文件
+            for file in self.temp_dir.glob("response_*.mp3"):
+                try:
+                    file.unlink()
+                except Exception as e:
+                    logger.warning(f"清理临时文件失败: {str(e)}")
+        except Exception as e:
+            logger.error(f"清理资源失败: {str(e)}")
+
 def main():
     """主程序入口"""
+    jarvis = None
     try:
         logger.info("启动 Jarvis 系统")
         jarvis = Jarvis()
         jarvis.greet()
         
         while True:
-            print("\n=== Jarvis 命令菜单 ===")
-            print("1: 文字输入")
-            print("2: 语音输入")
-            print("3: 持续文字对话")
-            print("4: 持续语音对话")
-            print("h: 显示历史记录")
-            print("s: 显示统计信息")
-            print("c: 清除历史记录")
-            print("q: 退出")
-            print("=====================")
+            menu = Panel("""
+[cyan]1[/cyan]: 文字输入
+[cyan]2[/cyan]: 语音输入
+[cyan]3[/cyan]: 持续文字对话
+[cyan]4[/cyan]: 持续语音对话
+[cyan]h[/cyan]: 显示历史记录
+[cyan]s[/cyan]: 显示统计信息
+[cyan]c[/cyan]: 清除历史记录
+[cyan]q[/cyan]: 退出
+            """, title="Jarvis 命令菜单", border_style="green")
             
-            choice = input("\n请选择: ").lower()
+            console.print(menu)
+            
+            choice = Prompt.ask("\n请选择", default="1").lower()
             
             if choice == 'q':
                 logger.info("用户请求退出")
-                print("再见！")
+                console.print("[yellow]再见！[/yellow]")
                 break
             elif choice == 'h':
                 jarvis.show_history()
@@ -253,39 +400,38 @@ def main():
                 jarvis.show_stats()
                 continue
             elif choice == 'c':
-                confirm = input("确定要清除所有历史记录吗？(y/n): ").lower()
+                confirm = Prompt.ask("确定要清除所有历史记录吗？", choices=["y", "n"], default="n")
                 if confirm == 'y':
                     jarvis.db.clear_history()
-                    print("历史记录已清除")
+                    console.print("[green]历史记录已清除[/green]")
                 continue
             
             if choice == '1':
-                user_input = input("\n请输入您的问题: ")
+                user_input = Prompt.ask("\n请输入您的问题")
                 input_type = "text"
                 if user_input:
-                    response = jarvis.chat(user_input, input_type)
-                    print(f"\nJarvis: {response}")
+                    jarvis.chat(user_input, input_type)
             elif choice == '2':
                 user_input = jarvis.listen()
                 input_type = "voice"
                 if user_input:
-                    print("\n正在生成回复...")
-                    response = jarvis.chat(user_input, input_type)
-                    print(f"\nJarvis: {response}")
+                    jarvis.chat(user_input, input_type)
                 else:
-                    print("未能识别语音，请重试")
+                    console.print("[red]未能识别语音，请重试[/red]")
             elif choice == '3':
                 jarvis.continuous_chat(mode="text")
             elif choice == '4':
                 jarvis.continuous_chat(mode="voice")
             else:
-                print("无效的选择，请重试")
+                console.print("[red]无效的选择，请重试[/red]")
                 continue
             
     except Exception as e:
         logger.error(f"系统运行时出错: {str(e)}")
-        raise
+        console.print(f"[red]系统错误: {str(e)}[/red]")
     finally:
+        if jarvis:
+            jarvis.cleanup()
         logger.info("Jarvis 系统已关闭")
 
 if __name__ == "__main__":

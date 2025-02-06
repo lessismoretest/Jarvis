@@ -77,6 +77,40 @@ class GeminiAI(BaseAIModel):
         logger.info("初始化 Gemini 客户端")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # 用于语音合成的回调函数
+        self.tts_callback = None
+    
+    def set_tts_callback(self, callback):
+        """设置语音合成回调函数"""
+        self.tts_callback = callback
+    
+    def _split_into_sentences(self, text: str) -> list:
+        """
+        将文本分割成句子
+        
+        Args:
+            text: 要分割的文本
+            
+        Returns:
+            list: 句子列表
+        """
+        # 使用常见的中文和英文标点符号作为分隔符
+        delimiters = ['。', '！', '？', '；', '.', '!', '?', ';']
+        sentences = []
+        current = []
+        
+        for char in text:
+            current.append(char)
+            if char in delimiters:
+                sentences.append(''.join(current))
+                current = []
+        
+        # 处理最后一个不完整的句子
+        if current:
+            sentences.append(''.join(current))
+        
+        return sentences
     
     def generate_response(self, prompt: str) -> str:
         """使用Gemini生成回复（流式输出）"""
@@ -119,14 +153,44 @@ class GeminiAI(BaseAIModel):
             
             # 收集并显示流式响应
             full_response = []
-            print("\nJarvis: ", end="", flush=True)
+            current_sentence = []
             
-            for chunk in response_stream:
-                if chunk.text:
-                    print(chunk.text, end="", flush=True)
-                    full_response.append(chunk.text)
+            # 创建一个 Live 上下文用于动态更新 Markdown
+            from rich.live import Live
+            from rich.markdown import Markdown
+            from rich.console import Console
             
-            print()  # 换行
+            console = Console()
+            console.print("\nJarvis:")
+            
+            with Live(console=console, refresh_per_second=4) as live:
+                for chunk in response_stream:
+                    if chunk.text:
+                        full_response.append(chunk.text)
+                        current_sentence.append(chunk.text)
+                        
+                        # 检查是否有完整的句子
+                        current_text = ''.join(current_sentence)
+                        sentences = self._split_into_sentences(current_text)
+                        
+                        if len(sentences) > 1:  # 有完整的句子
+                            # 保留最后一个不完整的句子
+                            current_sentence = [sentences[-1]]
+                            
+                            # 对完整的句子进行语音合成
+                            if self.tts_callback:
+                                for sentence in sentences[:-1]:
+                                    self.tts_callback(sentence)
+                        
+                        # 实时更新 Markdown 渲染
+                        current_response = "".join(full_response)
+                        live.update(Markdown(current_response))
+            
+            # 处理最后一个句子
+            if current_sentence and self.tts_callback:
+                last_sentence = ''.join(current_sentence)
+                if last_sentence.strip():
+                    self.tts_callback(last_sentence)
             
             # 合并所有响应
             result = "".join(full_response).strip()

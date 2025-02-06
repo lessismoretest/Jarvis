@@ -34,19 +34,22 @@ class EdgeTTSSynthesizer:
         communicate = edge_tts.Communicate(text, self.voice)
         await communicate.save(output_file)
     
-    def text_to_speech(self, text: str) -> str:
+    def text_to_speech(self, text: str, output_file: str = None) -> str:
         """
         将文字转换为语音
         
         Args:
             text: 要转换的文本
+            output_file: 可选的输出文件路径，如果不指定则自动生成
             
         Returns:
             str: 生成的音频文件路径
         """
         try:
             logger.info(f"开始转换文字为语音: {text}")
-            output_file = str(self.output_dir / "response.mp3")
+            
+            if output_file is None:
+                output_file = str(self.output_dir / "response.mp3")
             
             # 运行异步任务
             asyncio.run(self._generate_speech(text, output_file))
