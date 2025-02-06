@@ -4,9 +4,11 @@
 Jarvis - 个人智能助手系统
 基于钢铁侠电影中的 J.A.R.V.I.S. (Just A Rather Very Intelligent System)
 """
+import os
 from config import DEFAULT_AI_MODEL
 from ai_models import DeepseekAI, GeminiAI
 from speech.recognizer import WhisperRecognizer
+from speech.synthesizer import EdgeTTSSynthesizer
 from utils.logger import setup_logger
 
 # 创建logger实例
@@ -24,6 +26,7 @@ class Jarvis:
         logger.info(f"正在初始化 Jarvis，使用 {ai_model} 模型")
         self.ai_model = self._initialize_ai_model(ai_model)
         self.speech_recognizer = WhisperRecognizer()
+        self.speech_synthesizer = EdgeTTSSynthesizer()
         logger.info("Jarvis 初始化完成")
     
     def _initialize_ai_model(self, model_name: str):
@@ -55,6 +58,26 @@ class Jarvis:
         print(message)
         logger.info("Jarvis 已启动并发送问候")
     
+    def speak(self, text: str):
+        """
+        将文字转换为语音并播放
+        
+        Args:
+            text: 要说出的文字
+        """
+        try:
+            # 生成语音文件
+            audio_file = self.speech_synthesizer.text_to_speech(text)
+            
+            # 使用系统命令播放音频
+            if os.name == 'posix':  # Mac/Linux
+                os.system(f"afplay {audio_file}")
+            else:  # Windows
+                os.system(f"start {audio_file}")
+                
+        except Exception as e:
+            logger.error(f"语音播放失败: {str(e)}")
+    
     def chat(self, message: str) -> str:
         """
         与AI模型对话
@@ -69,6 +92,8 @@ class Jarvis:
             logger.info(f"收到用户输入: {message}")
             response = self.ai_model.generate_response(message)
             logger.info(f"AI响应: {response}")
+            # 添加语音输出
+            self.speak(response)
             return response
         except Exception as e:
             error_msg = f"处理请求时出错: {str(e)}"

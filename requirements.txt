@@ -5,6 +5,7 @@ openai-whisper>=20231117    # 用于语音识别
 sounddevice>=0.4.6     # 用于录音
 soundfile>=0.12.1      # 用于音频文件处理
 numpy>=1.24.0          # 用于音频处理
+edge-tts>=6.1.9        # 用于语音合成
 
 # 工具依赖
 python-dotenv>=1.0.0   # 用于环境变量管理
