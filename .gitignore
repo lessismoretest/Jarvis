@@ -43,4 +43,9 @@ ENV/
 logs/
 
 # 本地开发配置
-local_settings.py 
+local_settings.py
+
+# 临时文件
+temp/
+*.wav
+*.mp3 

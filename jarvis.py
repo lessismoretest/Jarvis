@@ -6,6 +6,7 @@ Jarvis - 个人智能助手系统
 """
 from config import DEFAULT_AI_MODEL
 from ai_models import DeepseekAI, GeminiAI
+from speech.recognizer import WhisperRecognizer
 from utils.logger import setup_logger
 
 # 创建logger实例
@@ -22,6 +23,7 @@ class Jarvis:
         self.name = "Jarvis"
         logger.info(f"正在初始化 Jarvis，使用 {ai_model} 模型")
         self.ai_model = self._initialize_ai_model(ai_model)
+        self.speech_recognizer = WhisperRecognizer()
         logger.info("Jarvis 初始化完成")
     
     def _initialize_ai_model(self, model_name: str):
@@ -73,6 +75,24 @@ class Jarvis:
             logger.error(error_msg)
             return f"抱歉，{error_msg}"
 
+    def listen(self, duration: int = 5) -> str:
+        """
+        监听用户语音输入
+        
+        Args:
+            duration: 录音时长（秒）
+            
+        Returns:
+            str: 识别出的文字
+        """
+        try:
+            audio_path = self.speech_recognizer.record_audio(duration)
+            text = self.speech_recognizer.transcribe_audio(audio_path)
+            return text
+        except Exception as e:
+            logger.error(f"语音识别失败: {str(e)}")
+            return ""
+
 def main():
     """主程序入口"""
     try:
@@ -81,14 +101,26 @@ def main():
         jarvis.greet()
         
         while True:
-            user_input = input("\n请输入您的问题 (输入 'quit' 退出): ")
-            if user_input.lower() == 'quit':
+            choice = input("\n选择输入方式 (1: 文字, 2: 语音, q: 退出): ")
+            
+            if choice.lower() == 'q':
                 logger.info("用户请求退出")
                 print("再见！")
                 break
             
-            response = jarvis.chat(user_input)
-            print(f"\nJarvis: {response}")
+            if choice == '1':
+                user_input = input("\n请输入您的问题: ")
+            elif choice == '2':
+                print("\n请说话（5秒）...")
+                user_input = jarvis.listen()
+                print(f"识别结果: {user_input}")
+            else:
+                print("无效的选择，请重试")
+                continue
+            
+            if user_input:
+                response = jarvis.chat(user_input)
+                print(f"\nJarvis: {response}")
             
     except Exception as e:
         logger.error(f"系统运行时出错: {str(e)}")
