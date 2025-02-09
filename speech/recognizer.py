@@ -225,8 +225,18 @@ class WhisperRecognizer:
             logger.info(f"开始转写音频: {audio_path}")
             console.print("\n[bold cyan]正在进行语音识别...[/bold cyan]")
             
-            # 使用简单的进度条
-            with tqdm(total=100, desc="语音识别", ncols=80) as pbar:
+            # 使用rich的进度条
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(complete_style="green", finished_style="bright_green"),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+                transient=True
+            ) as progress:
+                task = progress.add_task("[cyan]语音识别中...", total=100)
+                
                 # 使用转写选项
                 result = self.model.transcribe(
                     audio_path,
@@ -234,8 +244,9 @@ class WhisperRecognizer:
                     initial_prompt="这是一段中文对话。",
                     temperature=0.0,
                 )
-                pbar.n = 100
-                pbar.refresh()
+                
+                # 确保进度条完成
+                progress.update(task, completed=100)
             
             text = result["text"].strip()
             logger.info(f"音频转写完成: {text}")

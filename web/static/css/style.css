@@ -106,4 +106,191 @@
 .markdown-content h1, .markdown-content h2, .markdown-content h3 {
     margin: 1em 0 0.5em;
     font-weight: bold;
+}
+
+/* 工具栏样式 */
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+}
+
+.tool-group:hover {
+    background-color: #f3f4f6;
+}
+
+.tool-label {
+    font-size: 0.875rem;
+    color: #374151;
+    margin-right: 0.5rem;
+}
+
+/* 语音按钮样式 */
+#voice-btn {
+    transition: all 0.2s ease;
+}
+
+#voice-btn:active {
+    transform: scale(0.95);
+}
+
+/* 录音指示器动画 */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.animate-pulse {
+    animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 录音状态样式 */
+.recording {
+    background-color: #ef4444 !important;
+    color: white !important;
+}
+
+/* 移动端优化 */
+@media (max-width: 640px) {
+    #voice-btn {
+        padding: 0.5rem;
+    }
+    
+    #recording-indicator {
+        font-size: 0.875rem;
+    }
+}
+
+/* 消息工具区域样式 */
+.message-tools {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    border-top: 1px solid #edf2f7;
+    padding-top: 0.5rem;
+}
+
+.message:hover .message-tools {
+    opacity: 1;
+}
+
+.message-tools button {
+    transition: all 0.2s ease-in-out;
+}
+
+.message-tools button:active {
+    transform: scale(0.95);
+}
+
+/* 左侧菜单按钮 */
+.menu-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+    margin-bottom: 8px;
+}
+
+.menu-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menu-btn.active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 设置菜单按钮 */
+.settings-menu-btn {
+    padding: 0.5rem 1rem;
+    width: 100%;
+    text-align: left;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.settings-menu-btn:hover {
+    background-color: #f3f4f6;
+}
+
+.settings-menu-btn.active {
+    background-color: #e5e7eb;
+    font-weight: 600;
+}
+
+/* 页面布局 */
+html, body {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+}
+
+.container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 聊天区域 */
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    padding: 1.5rem;
+    overflow: hidden;
+    min-height: 0; /* 防止flex子元素溢出 */
+}
+
+#chat-history {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* 防止flex子元素溢出 */
+    padding-right: 0.5rem; /* 为滚动条留出空间 */
+}
+
+/* 工具栏和输入区域固定高度 */
+.tool-group {
+    flex-shrink: 0; /* 防止工具栏被压缩 */
+}
+
+.input-group {
+    flex-shrink: 0; /* 防止输入区域被压缩 */
+    margin-top: 1rem;
+}
+
+/* 设置页面样式 */
+#settings-page {
+    height: 100vh;
+    overflow-y: auto;
 } 

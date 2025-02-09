@@ -19,6 +19,7 @@ class EdgeTTSSynthesizer:
             voice: 声音选项，默认使用中文女声
         """
         self.voice = voice
+        self.enabled = True  # 添加enabled标志
         self.output_dir = Path("temp")
         self.output_dir.mkdir(exist_ok=True)
         logger.info(f"初始化Edge TTS，使用声音: {voice}")
@@ -43,8 +44,12 @@ class EdgeTTSSynthesizer:
             output_file: 可选的输出文件路径，如果不指定则自动生成
             
         Returns:
-            str: 生成的音频文件路径
+            str: 生成的音频文件路径，如果语音功能关闭则返回None
         """
+        if not self.enabled:
+            logger.info("语音功能已关闭，跳过语音生成")
+            return None
+            
         try:
             logger.info(f"开始转换文字为语音: {text}")
             
