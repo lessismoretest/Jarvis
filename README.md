@@ -224,4 +224,54 @@ jarvis/
 
 ## 联系方式
 
-[添加你的联系方式] 
+[添加你的联系方式]
+
+## Web界面
+
+Jarvis现在提供了一个现代化的Web界面，让您可以通过浏览器与AI助手进行交互。
+
+### 启动Web服务
+
+```bash
+# 进入项目目录
+cd Jarvis
+
+# 启动Web服务
+python web/app.py
+```
+
+服务启动后，访问 http://localhost:5000 即可使用Web界面。
+
+### Web界面功能
+
+- 实时对话：通过WebSocket实现即时响应
+- Markdown支持：支持富文本显示
+- 历史记录：自动加载最近的对话记录
+- 响应式设计：支持移动端访问
+
+### Web界面流程图
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Browser as 浏览器
+    participant Server as Web服务器
+    participant Jarvis as Jarvis系统
+    
+    User->>Browser: 访问网页
+    Browser->>Server: 请求页面
+    Server->>Browser: 返回页面
+    Browser->>Server: 请求历史记录
+    Server->>Jarvis: 获取历史
+    Jarvis->>Server: 返回历史
+    Server->>Browser: 显示历史记录
+    
+    loop 对话循环
+        User->>Browser: 输入消息
+        Browser->>Server: 发送WebSocket消息
+        Server->>Jarvis: 处理消息
+        Jarvis->>Server: 返回响应
+        Server->>Browser: 发送WebSocket响应
+        Browser->>User: 显示响应
+    end
+``` 

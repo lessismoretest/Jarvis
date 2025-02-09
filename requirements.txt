@@ -15,4 +15,11 @@ python-json-logger>=2.0.0  # 用于JSON格式日志
 mysql-connector-python>=8.0.0  # MySQL数据库连接
 
 # 日志相关
-python-json-logger>=2.0.0  # 可选，用于JSON格式日志 
+python-json-logger>=2.0.0  # 可选，用于JSON格式日志
+
+# 新增依赖
+flask==3.0.2
+flask-socketio==5.3.6
+python-socketio==5.11.1
+python-engineio==4.9.0
+eventlet==0.35.2 
