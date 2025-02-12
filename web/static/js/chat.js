@@ -20,6 +20,11 @@ const settingsPage = document.getElementById('settings-page');
 const settingsMenuButtons = document.querySelectorAll('.settings-menu-btn');
 const settingsContents = document.querySelectorAll('.settings-content');
 
+// 会话管理相关
+const newChatBtn = document.getElementById('new-chat-btn');
+const chatList = document.getElementById('chat-list');
+let currentChatId = null;
+
 // 页面切换处理
 menuButtons.forEach(button => {
     button.addEventListener('click', () => {
@@ -346,13 +351,52 @@ function parseMarkdown(text) {
 
 // 添加消息到聊天历史
 function addMessage(message, isUser = false) {
+    // 隐藏加载指示器
+    hideTypingIndicator();
+    
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
     
     // 消息内容区域
     const content = document.createElement('div');
     content.className = 'markdown-content';
-    content.innerHTML = parseMarkdown(message);
+    
+    if (!isUser) {
+        // 处理Mermaid图表
+        const mermaidRegex = /```mermaid([\s\S]*?)```/g;
+        let lastIndex = 0;
+        let match;
+        let messageHTML = '';
+        
+        while ((match = mermaidRegex.exec(message)) !== null) {
+            // 添加Mermaid图表前的文本
+            messageHTML += parseMarkdown(message.slice(lastIndex, match.index));
+            
+            // 创建Mermaid图表容器
+            const mermaidId = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            messageHTML += `<div class="mermaid-container"><div class="mermaid" id="${mermaidId}">${match[1].trim()}</div></div>`;
+            
+            lastIndex = match.index + match[0].length;
+        }
+        
+        // 添加剩余的文本
+        messageHTML += parseMarkdown(message.slice(lastIndex));
+        content.innerHTML = messageHTML;
+        
+        // 渲染所有新的Mermaid图表
+        setTimeout(() => {
+            content.querySelectorAll('.mermaid').forEach(element => {
+                try {
+                    mermaid.init(undefined, element);
+                } catch (error) {
+                    console.error('Mermaid渲染失败:', error);
+                    element.innerHTML = '图表渲染失败: ' + error.message;
+                }
+            });
+        }, 0);
+    } else {
+        content.innerHTML = parseMarkdown(message);
+    }
     
     // 消息工具区域
     const toolsDiv = document.createElement('div');
@@ -419,7 +463,154 @@ function hideTypingIndicator() {
     }
 }
 
-// 发送消息
+// 创建新会话
+async function createNewChat() {
+    try {
+        // 调用新建会话API
+        const response = await fetch('/api/chat/new', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            throw new Error('创建新会话失败');
+        }
+        
+        // 创建新的会话项
+        const chatId = Date.now().toString();
+        const chatItem = createChatItem(chatId, '新的对话');
+        chatList.insertBefore(chatItem, chatList.firstChild);
+        switchToChat(chatId);
+        saveChatList();
+        
+        // 清空聊天历史
+        chatHistory.innerHTML = '';
+        
+    } catch (error) {
+        console.error('创建新会话失败:', error);
+        addMessage('错误: 创建新会话失败', false);
+    }
+}
+
+// 创建会话项
+function createChatItem(id, title) {
+    const div = document.createElement('div');
+    div.className = 'chat-item';
+    div.dataset.id = id;
+    div.innerHTML = `
+        <i class="fas fa-comments"></i>
+        <span class="title">${title}</span>
+        <button class="delete-btn" onclick="deleteChat('${id}')">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    div.onclick = (e) => {
+        if (!e.target.closest('.delete-btn')) {
+            switchToChat(id);
+        }
+    };
+    return div;
+}
+
+// 切换到指定会话
+function switchToChat(chatId) {
+    // 移除之前的活动状态
+    const activeItem = chatList.querySelector('.chat-item.active');
+    if (activeItem) {
+        activeItem.classList.remove('active');
+    }
+    
+    // 设置新的活动状态
+    const newActiveItem = chatList.querySelector(`.chat-item[data-id="${chatId}"]`);
+    if (newActiveItem) {
+        newActiveItem.classList.add('active');
+        currentChatId = chatId;
+        
+        // 清空聊天历史
+        chatHistory.innerHTML = '';
+        
+        // 加载会话历史
+        loadChatHistory(chatId);
+    }
+}
+
+// 删除会话
+function deleteChat(chatId) {
+    const chatItem = chatList.querySelector(`.chat-item[data-id="${chatId}"]`);
+    if (chatItem) {
+        chatItem.remove();
+        
+        // 如果删除的是当前会话，创建新会话
+        if (currentChatId === chatId) {
+            createNewChat();
+        }
+        
+        // 删除会话历史
+        deleteChatHistory(chatId);
+        saveChatList();
+    }
+}
+
+// 保存会话列表
+function saveChatList() {
+    const chats = [];
+    chatList.querySelectorAll('.chat-item').forEach(item => {
+        chats.push({
+            id: item.dataset.id,
+            title: item.querySelector('.title').textContent
+        });
+    });
+    localStorage.setItem('chatList', JSON.stringify(chats));
+}
+
+// 加载会话列表
+function loadChatList() {
+    const chats = JSON.parse(localStorage.getItem('chatList') || '[]');
+    chatList.innerHTML = '';
+    chats.forEach(chat => {
+        chatList.appendChild(createChatItem(chat.id, chat.title));
+    });
+    
+    // 如果没有会话，创建新会话
+    if (chats.length === 0) {
+        createNewChat();
+    } else {
+        // 切换到第一个会话
+        switchToChat(chats[0].id);
+    }
+}
+
+// 加载会话历史
+async function loadChatHistory(chatId) {
+    try {
+        const response = await fetch(`/api/history/${chatId}`);
+        const data = await response.json();
+        
+        if (data.history) {
+            data.history.reverse().forEach(record => {
+                addMessage(record.user_input, true);
+                addMessage(record.ai_response);
+            });
+        }
+    } catch (error) {
+        console.error('加载会话历史失败:', error);
+    }
+}
+
+// 删除会话历史
+async function deleteChatHistory(chatId) {
+    try {
+        await fetch(`/api/history/${chatId}`, {
+            method: 'DELETE'
+        });
+    } catch (error) {
+        console.error('删除会话历史失败:', error);
+    }
+}
+
+// 事件监听
+newChatBtn.addEventListener('click', createNewChat);
+
+// 修改发送消息函数，添加会话ID
 function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
@@ -434,7 +625,10 @@ function sendMessage() {
     showTypingIndicator();
     
     // 发送消息到服务器
-    socket.emit('message', { message });
+    socket.emit('message', { 
+        message,
+        chatId: currentChatId  // 添加会话ID
+    });
 }
 
 // 事件监听器
@@ -489,4 +683,7 @@ async function loadHistory() {
 }
 
 // 页面加载完成后加载历史记录
-document.addEventListener('DOMContentLoaded', loadHistory); 
+document.addEventListener('DOMContentLoaded', loadHistory);
+
+// 页面加载完成后加载会话列表
+document.addEventListener('DOMContentLoaded', loadChatList); 

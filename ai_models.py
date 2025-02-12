@@ -35,17 +35,22 @@ class DeepseekAI(BaseAIModel):
             api_key=api_key,
             base_url=api_base
         )
+        # 初始化对话消息列表
+        self.messages = [
+            {"role": "system", "content": "你是一个智能助手，请用简洁友好的方式回答问题。"}
+        ]
     
     def generate_response(self, prompt: str) -> str:
         """使用Deepseek生成回复"""
         try:
             logger.debug(f"向Deepseek发送请求: {prompt}")
+            
+            # 添加用户消息
+            self.messages.append({"role": "user", "content": prompt})
+            
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
-                messages=[
-                    {"role": "system", "content": "你是一个智能助手，请用简洁友好的方式回答问题。"},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=self.messages,
                 temperature=0.7,
                 max_tokens=2000,
                 stream=False
@@ -56,6 +61,10 @@ class DeepseekAI(BaseAIModel):
                 raise ValueError("API返回空响应")
             
             result = response.choices[0].message.content.strip()
+            
+            # 添加助手回复到消息历史
+            self.messages.append({"role": "assistant", "content": result})
+            
             logger.debug(f"Deepseek响应: {result}")
             return result
             
@@ -77,6 +86,8 @@ class GeminiAI(BaseAIModel):
         logger.info("初始化 Gemini 客户端")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        # 创建持久化的聊天会话
+        self.chat = self.model.start_chat(history=[])
         
         # 用于语音合成的回调函数
         self.tts_callback = None
@@ -143,12 +154,12 @@ class GeminiAI(BaseAIModel):
                 },
             ]
             
-            # 使用流式生成
-            response_stream = self.model.generate_content(
+            # 使用聊天会话发送消息并获取流式响应
+            response = self.chat.send_message(
                 prompt,
                 generation_config=generation_config,
                 safety_settings=safety_settings,
-                stream=True  # 启用流式输出
+                stream=True
             )
             
             # 收集并显示流式响应
@@ -164,7 +175,7 @@ class GeminiAI(BaseAIModel):
             console.print("\nJarvis:")
             
             with Live(console=console, refresh_per_second=4) as live:
-                for chunk in response_stream:
+                for chunk in response:
                     if chunk.text:
                         full_response.append(chunk.text)
                         current_sentence.append(chunk.text)

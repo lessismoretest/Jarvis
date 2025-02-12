@@ -7,17 +7,41 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <!-- 添加Mermaid支持 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'sans-serif'
+        });
+    </script>
 </head>
 <body>
     <div class="flex h-screen">
         <!-- 左侧菜单 -->
-        <div class="w-16 bg-gray-800 flex flex-col justify-between">
-            <div class="flex flex-col items-center py-4">
+        <div class="w-64 bg-gray-800 flex flex-col">
+            <!-- 顶部按钮区 -->
+            <div class="flex flex-col items-center py-4 space-y-2">
+                <button id="new-chat-btn" class="w-48 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus"></i>
+                    <span>新建会话</span>
+                </button>
+            </div>
+
+            <!-- 会话列表 -->
+            <div class="flex-1 overflow-y-auto px-2">
+                <div id="chat-list" class="space-y-1">
+                    <!-- 会话项会动态插入到这里 -->
+                </div>
+            </div>
+
+            <!-- 底部菜单 -->
+            <div class="flex flex-col items-center py-4 border-t border-gray-700">
                 <button class="menu-btn active" data-target="chat">
                     <i class="fas fa-comment text-white text-xl"></i>
                 </button>
-            </div>
-            <div class="flex flex-col items-center py-4">
                 <button class="menu-btn" data-target="settings">
                     <i class="fas fa-cog text-white text-xl"></i>
                 </button>

@@ -26,11 +26,23 @@ def handle_message(data):
     """处理WebSocket消息"""
     try:
         user_message = data.get('message', '')
-        if not user_message:
+        chat_id = data.get('chatId', '')  # 获取会话ID
+        
+        if not user_message or not chat_id:
             return
             
         # 调用Jarvis处理消息
         response = jarvis.chat(user_message)
+        
+        # 保存对话记录
+        jarvis.db.save_chat(
+            session_id=chat_id,
+            input_type='text',
+            user_input=user_message,
+            ai_response=response,
+            model_used=jarvis.ai_model.__class__.__name__,
+            response_time=0.0  # TODO: 添加响应时间计算
+        )
         
         # 发送响应回客户端
         emit('response', {'message': response})
@@ -60,6 +72,25 @@ def get_history():
         limit = request.args.get('limit', 10, type=int)
         history = jarvis.db.get_chat_history(limit=limit)
         return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/history/<chat_id>')
+def get_chat_history(chat_id):
+    """获取指定会话的聊天历史"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        history = jarvis.db.get_chat_history(session_id=chat_id, limit=limit)
+        return jsonify({'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/history/<chat_id>', methods=['DELETE'])
+def delete_chat_history(chat_id):
+    """删除指定会话的聊天历史"""
+    try:
+        jarvis.db.clear_history(session_id=chat_id)
+        return jsonify({'message': '会话历史已删除'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -153,6 +184,19 @@ def speech_to_text():
             if os.path.exists(temp_path):
                 os.remove(temp_path)
                 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chat/new', methods=['POST'])
+def new_chat():
+    """创建新会话"""
+    try:
+        # 重新初始化Jarvis实例，保持当前的AI模型选择
+        global jarvis
+        current_model = jarvis.ai_model.__class__.__name__.lower().replace('ai', '')
+        jarvis = Jarvis(ai_model=current_model)
+        
+        return jsonify({'message': '新会话已创建'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
