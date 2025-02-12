@@ -1,3 +1,15 @@
+/* 微信主题颜色 */
+:root {
+    --wx-bg: #ededed;
+    --wx-green: #07c160;
+    --wx-light-green: #95ec69;
+    --wx-chat-bg: #f5f5f5;
+    --wx-hover: rgba(0, 0, 0, 0.1);
+    --wx-border: #d9d9d9;
+    --wx-text: #333333;
+    --wx-secondary-text: #999999;
+}
+
 /* 自定义滚动条样式 */
 ::-webkit-scrollbar {
     width: 8px;
@@ -19,23 +31,73 @@
 
 /* 聊天气泡样式 */
 .message {
-    max-width: 80%;
-    margin: 8px 0;
+    max-width: 70%;
+    margin: 16px 0;
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 4px;
+    font-size: 15px;
+    line-height: 1.6;
     position: relative;
+    clear: both;
+    display: flex;
+    flex-direction: column;
 }
 
-.user-message {
-    background-color: #e3f2fd;
+/* 消息容器样式 */
+.message-container {
+    display: flex;
+    align-items: flex-start;
+    margin: 16px 0;
+    clear: both;
+}
+
+/* 用户消息容器 */
+.user-message-container {
+    flex-direction: row-reverse;
     margin-left: auto;
-    border-bottom-right-radius: 4px;
+}
+
+/* 机器人消息容器 */
+.bot-message-container {
+    flex-direction: row;
+    margin-right: auto;
+}
+
+/* 头像样式 */
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    margin: 0 12px;
+    flex-shrink: 0;
+}
+
+.bot-avatar {
+    background-image: url('/static/images/bot-avatar.png');
+    background-size: cover;
+    background-position: center;
+}
+
+.user-avatar {
+    background-image: url('/static/images/user-avatar.png');
+    background-size: cover;
+    background-position: center;
+}
+
+/* 调整消息气泡样式 */
+.user-message {
+    background-color: var(--wx-light-green);
+    color: var(--wx-text);
+    border-radius: 4px;
+    margin: 0;
 }
 
 .bot-message {
-    background-color: #f5f5f5;
-    margin-right: auto;
-    border-bottom-left-radius: 4px;
+    background-color: white;
+    color: var(--wx-text);
+    border-radius: 4px;
+    margin: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* 加载动画 */
@@ -184,8 +246,17 @@ select:focus {
 .message-tools {
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
-    border-top: 1px solid #edf2f7;
     padding-top: 0.5rem;
+    text-align: right;
+    width: 100%;
+}
+
+.user-message .message-tools {
+    text-align: right;
+}
+
+.bot-message .message-tools {
+    text-align: left;
 }
 
 .message:hover .message-tools {
@@ -210,14 +281,27 @@ select:focus {
     justify-content: center;
     transition: all 0.2s ease-in-out;
     margin-bottom: 8px;
+    color: var(--wx-text);
 }
 
 .menu-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--wx-hover);
 }
 
 .menu-btn.active {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: var(--wx-hover);
+    color: var(--wx-green);
+}
+
+.menu-btn i {
+    font-size: 20px;
+}
+
+/* 左侧底部菜单容器 */
+.flex.flex-col.items-center.py-4.border-t.border-gray-700 {
+    border-color: var(--wx-border) !important;
+    padding: 16px 0;
+    background-color: white;
 }
 
 /* 设置菜单按钮 */
@@ -244,6 +328,9 @@ html, body {
     margin: 0;
     padding: 0;
     overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background-color: var(--wx-bg);
+    color: var(--wx-text);
 }
 
 body {
@@ -275,8 +362,8 @@ body {
 #chat-history {
     flex: 1;
     overflow-y: auto;
-    min-height: 0; /* 防止flex子元素溢出 */
-    padding-right: 0.5rem; /* 为滚动条留出空间 */
+    min-height: 0;
+    padding: 20px;
 }
 
 /* 工具栏和输入区域固定高度 */
@@ -437,4 +524,176 @@ body {
     white-space: pre-wrap;
     font-family: monospace;
     overflow-x: auto;
+}
+
+/* 左侧菜单样式 */
+.w-64 {
+    width: 280px !important;
+}
+
+.bg-gray-800 {
+    background-color: white !important;
+    border-right: 1px solid var(--wx-border);
+}
+
+/* 新建会话按钮 */
+#new-chat-btn {
+    background-color: var(--wx-green) !important;
+    transition: opacity 0.2s;
+}
+
+#new-chat-btn:hover {
+    opacity: 0.9;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 会话列表样式 */
+.chat-item {
+    padding: 12px 16px;
+    border-radius: 0;
+    color: var(--wx-text);
+    border-bottom: 1px solid var(--wx-border);
+    margin: 0;
+}
+
+.chat-item:hover {
+    background-color: var(--wx-hover);
+}
+
+.chat-item.active {
+    background-color: var(--wx-hover);
+}
+
+/* 聊天区域样式 */
+.chat-container {
+    background-color: var(--wx-chat-bg);
+    box-shadow: none;
+    border-radius: 0;
+}
+
+/* 输入区域样式 */
+.input-group {
+    background-color: #f5f5f5;
+    border-top: 1px solid var(--wx-border);
+    padding: 12px;
+}
+
+#message-input {
+    background-color: white;
+    border: 1px solid var(--wx-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 15px;
+}
+
+#message-input:focus {
+    border-color: var(--wx-green);
+    box-shadow: none;
+}
+
+#send-btn {
+    background-color: var(--wx-green);
+    border-radius: 4px;
+    font-size: 15px;
+    padding: 8px 20px;
+}
+
+#send-btn:hover {
+    opacity: 0.9;
+}
+
+/* 工具栏样式 */
+.tool-group {
+    background-color: white;
+    border-bottom: 1px solid var(--wx-border);
+    padding: 12px;
+}
+
+select {
+    border: 1px solid var(--wx-border);
+    border-radius: 4px;
+    padding: 6px 24px 6px 12px;
+    font-size: 14px;
+}
+
+select:focus {
+    border-color: var(--wx-green);
+    box-shadow: none;
+}
+
+/* 设置页面样式 */
+.settings-menu-btn {
+    color: var(--wx-text);
+    padding: 12px 16px;
+    border-radius: 0;
+}
+
+.settings-menu-btn:hover {
+    background-color: var(--wx-hover);
+}
+
+.settings-menu-btn.active {
+    background-color: var(--wx-hover);
+    color: var(--wx-green);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cccccc;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #999999;
+}
+
+/* 语音按钮样式 */
+#voice-btn {
+    background-color: white;
+    border: 1px solid var(--wx-border);
+    color: var(--wx-text);
+}
+
+#voice-btn:hover {
+    background-color: var(--wx-hover);
+}
+
+/* 录音状态样式 */
+#recording-indicator {
+    color: var(--wx-green);
+}
+
+/* 代码块样式 */
+.code-block {
+    background-color: white;
+    border: 1px solid var(--wx-border);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Markdown 内容样式 */
+.markdown-content {
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.markdown-content code {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.markdown-content pre {
+    background-color: white;
+    border: 1px solid var(--wx-border);
+    border-radius: 4px;
 } 

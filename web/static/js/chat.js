@@ -354,6 +354,15 @@ function addMessage(message, isUser = false) {
     // 隐藏加载指示器
     hideTypingIndicator();
     
+    // 创建消息容器
+    const messageContainer = document.createElement('div');
+    messageContainer.className = `message-container ${isUser ? 'user-message-container' : 'bot-message-container'}`;
+    
+    // 创建头像
+    const avatar = document.createElement('div');
+    avatar.className = `avatar ${isUser ? 'user-avatar' : 'bot-avatar'}`;
+    
+    // 创建消息气泡
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
     
@@ -409,7 +418,6 @@ function addMessage(message, isUser = false) {
     copyBtn.onclick = async () => {
         try {
             await navigator.clipboard.writeText(message);
-            // 临时改变按钮文字显示复制成功
             const originalText = copyBtn.innerHTML;
             copyBtn.innerHTML = '<i class="fas fa-check mr-1"></i>已复制';
             copyBtn.classList.add('text-green-500');
@@ -420,7 +428,6 @@ function addMessage(message, isUser = false) {
             }, 2000);
         } catch (err) {
             console.error('复制失败:', err);
-            // 显示复制失败提示
             const originalText = copyBtn.innerHTML;
             copyBtn.innerHTML = '<i class="fas fa-times mr-1"></i>复制失败';
             copyBtn.classList.add('text-red-500');
@@ -435,7 +442,12 @@ function addMessage(message, isUser = false) {
     toolsDiv.appendChild(copyBtn);
     messageDiv.appendChild(content);
     messageDiv.appendChild(toolsDiv);
-    chatHistory.appendChild(messageDiv);
+    
+    // 组装消息容器
+    messageContainer.appendChild(avatar);
+    messageContainer.appendChild(messageDiv);
+    
+    chatHistory.appendChild(messageContainer);
     
     // 滚动到底部
     chatHistory.scrollTop = chatHistory.scrollHeight;
