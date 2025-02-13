@@ -6,6 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import MermaidDiagram from './MermaidDiagram';
+import EChartDiagram from './EChartDiagram';
 
 interface ChatMessageProps {
   content: string;
@@ -14,143 +15,92 @@ interface ChatMessageProps {
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ content, isUser, timestamp }) => {
-  // 检查内容是否包含Mermaid图表
-  const hasMermaid = content.includes('```mermaid');
-
-  // 处理Mermaid图表
+  // 处理内容
   const renderContent = () => {
-    if (hasMermaid) {
-      const parts = content.split('```');
-      return parts.map((part, index) => {
-        if (part.startsWith('mermaid\n')) {
-          // 提取Mermaid图表内容
-          const chartContent = part.replace('mermaid\n', '');
-          return <MermaidDiagram key={index} chart={chartContent} />;
-        } else if (part.trim()) {
-          // 渲染普通Markdown内容
+    // 分割内容以处理特殊代码块
+    const parts = content.split(/(```(?:mermaid|echart|[a-z]*)\n[\s\S]*?```)/);
+    
+    return parts.map((part, index) => {
+      // 处理 Mermaid 图表
+      if (part.startsWith('```mermaid\n')) {
+        const chartContent = part.replace(/```mermaid\n([\s\S]*?)```/, '$1').trim();
+        return <MermaidDiagram key={index} chart={chartContent} />;
+      }
+      
+      // 处理 ECharts 图表
+      if (part.startsWith('```echart\n')) {
+        try {
+          const chartContent = part.replace(/```echart\n([\s\S]*?)```/, '$1').trim();
+          // 验证是否为有效的 JSON
+          const config = JSON.parse(chartContent);
+          return <EChartDiagram key={index} config={chartContent} />;
+        } catch (e: Error | unknown) {
+          console.error('Invalid EChart config:', e);
+          const errorMessage = e instanceof Error ? e.message : '未知错误';
           return (
-            <ReactMarkdown
-              key={index}
-              remarkPlugins={[remarkGfm]}
-              components={{
-                code({className, children}) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  return match ? (
-                    <SyntaxHighlighter
-                      language={match[1]}
-                      style={tomorrow}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  ) : (
-                    <code className={className}>
-                      {children}
-                    </code>
-                  );
-                },
-                table({children}) {
-                  return (
-                    <div className="table-container">
-                      <table style={{borderCollapse: 'collapse', width: '100%'}}>
-                        {children}
-                      </table>
-                    </div>
-                  );
-                },
-                th({children}) {
-                  return (
-                    <th 
-                      style={{
-                        border: '1px solid #ddd', 
-                        padding: '8px', 
-                        backgroundColor: '#f5f5f5'
-                      }}
-                    >
-                      {children}
-                    </th>
-                  );
-                },
-                td({children}) {
-                  return (
-                    <td 
-                      style={{
-                        border: '1px solid #ddd', 
-                        padding: '8px'
-                      }}
-                    >
-                      {children}
-                    </td>
-                  );
-                }
-              }}
-            >
-              {part}
-            </ReactMarkdown>
+            <div key={index} style={{ color: 'red', padding: '10px', margin: '10px 0', backgroundColor: '#ffebee' }}>
+              图表配置无效：{errorMessage}
+              <pre style={{ marginTop: '10px' }}>{part}</pre>
+            </div>
           );
         }
-        return null;
-      });
-    } else {
-      // 如果没有Mermaid图表，直接渲染Markdown
-      return (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            code({className, children}) {
-              const match = /language-(\w+)/.exec(className || '');
-              return match ? (
-                <SyntaxHighlighter
-                  language={match[1]}
-                  style={tomorrow}
-                >
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-              ) : (
-                <code className={className}>
-                  {children}
-                </code>
-              );
-            },
-            table({children}) {
-              return (
-                <div className="table-container">
-                  <table style={{borderCollapse: 'collapse', width: '100%'}}>
+      }
+      
+      // 处理其他代码块
+      if (part.startsWith('```')) {
+        const match = part.match(/```(\w*)\n([\s\S]*?)```/);
+        if (match) {
+          const [, language, code] = match;
+          return (
+            <SyntaxHighlighter
+              key={index}
+              language={language || 'text'}
+              style={tomorrow}
+            >
+              {code.trim()}
+            </SyntaxHighlighter>
+          );
+        }
+      }
+
+      // 处理普通文本
+      if (part.trim()) {
+        return (
+          <ReactMarkdown
+            key={index}
+            remarkPlugins={[remarkGfm]}
+            components={{
+              code({className, children}) {
+                const match = /language-(\w+)/.exec(className || '');
+                return match ? (
+                  <SyntaxHighlighter
+                    language={match[1]}
+                    style={tomorrow}
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code className={className}>
                     {children}
-                  </table>
-                </div>
-              );
-            },
-            th({children}) {
-              return (
-                <th 
-                  style={{
-                    border: '1px solid #ddd', 
-                    padding: '8px', 
-                    backgroundColor: '#f5f5f5'
-                  }}
-                >
-                  {children}
-                </th>
-              );
-            },
-            td({children}) {
-              return (
-                <td 
-                  style={{
-                    border: '1px solid #ddd', 
-                    padding: '8px'
-                  }}
-                >
-                  {children}
-                </td>
-              );
-            }
-          }}
-        >
-          {content}
-        </ReactMarkdown>
-      );
-    }
+                  </code>
+                );
+              },
+              table({children}) {
+                return (
+                  <div className="table-container">
+                    <table>{children}</table>
+                  </div>
+                );
+              }
+            }}
+          >
+            {part}
+          </ReactMarkdown>
+        );
+      }
+      
+      return null;
+    }).filter(Boolean);
   };
 
   return (

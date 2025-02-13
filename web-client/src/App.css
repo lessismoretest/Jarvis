@@ -137,6 +137,18 @@ code {
   animation: diagramAppear 0.5s ease forwards;
 }
 
+/* ECharts图表样式 */
+.echart-diagram {
+  margin: 16px 0;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: scale(0.95);
+  animation: diagramAppear 0.5s ease forwards;
+}
+
 /* 图表出现动画 */
 @keyframes diagramAppear {
   to {
@@ -145,7 +157,8 @@ code {
   }
 }
 
-.chat-message.user .mermaid-diagram {
+.chat-message.user .mermaid-diagram,
+.chat-message.user .echart-diagram {
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -195,7 +208,9 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
-html[data-theme='dark'] .table-container table {
+html[data-theme='dark'] .table-container table,
+html[data-theme='dark'] .mermaid-diagram,
+html[data-theme='dark'] .echart-diagram {
   background: #1f1f1f;
 }
 
@@ -215,8 +230,4 @@ html[data-theme='dark'] .table-container tr:hover {
 html[data-theme='dark'] :not(pre) > code {
   background: rgba(255, 255, 255, 0.1) !important;
   color: #ff9292 !important;
-}
-
-html[data-theme='dark'] .mermaid-diagram {
-  background: #1f1f1f;
 }

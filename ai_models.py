@@ -86,8 +86,29 @@ class GeminiAI(BaseAIModel):
         logger.info("初始化 Gemini 客户端")
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        # 创建持久化的聊天会话
+        
+        # 创建持久化的聊天会话并添加系统提示
         self.reset_chat()
+        
+        # 添加系统提示，指导模型如何格式化图表
+        system_prompt = """当需要生成图表时，请使用以下格式：
+        
+对于 ECharts 图表：
+```echart
+{
+    // ECharts配置对象
+}
+```
+
+对于 Mermaid 图表：
+```mermaid
+graph TD
+    // Mermaid图表定义
+```
+
+请确保 JSON 配置使用双引号，且格式正确。
+"""
+        self.chat.send_message(system_prompt)
         
         # 用于语音合成的回调函数
         self.tts_callback = None
