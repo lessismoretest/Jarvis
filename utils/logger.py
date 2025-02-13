@@ -86,4 +86,7 @@ def setup_logger(name: str) -> logging.Logger:
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    return logger 
+    return logger
+
+# 创建默认的logger实例
+logger = setup_logger('jarvis') 

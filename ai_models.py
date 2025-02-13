@@ -87,10 +87,15 @@ class GeminiAI(BaseAIModel):
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
         # 创建持久化的聊天会话
-        self.chat = self.model.start_chat(history=[])
+        self.reset_chat()
         
         # 用于语音合成的回调函数
         self.tts_callback = None
+    
+    def reset_chat(self):
+        """重置聊天会话"""
+        self.chat = self.model.start_chat(history=[])
+        logger.info("重置聊天会话")
     
     def set_tts_callback(self, callback):
         """设置语音合成回调函数"""
@@ -125,89 +130,108 @@ class GeminiAI(BaseAIModel):
     
     def generate_response(self, prompt: str) -> str:
         """使用Gemini生成回复（流式输出）"""
-        try:
-            logger.debug(f"向Gemini发送请求: {prompt}")
-            
-            generation_config = {
-                "temperature": 0.7,
-                "top_p": 0.8,
-                "top_k": 40,
-                "max_output_tokens": 2048,
-            }
-            
-            safety_settings = [
-                {
-                    "category": "HARM_CATEGORY_HARASSMENT",
-                    "threshold": "BLOCK_NONE",
-                },
-                {
-                    "category": "HARM_CATEGORY_HATE_SPEECH",
-                    "threshold": "BLOCK_NONE",
-                },
-                {
-                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                    "threshold": "BLOCK_NONE",
-                },
-                {
-                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                    "threshold": "BLOCK_NONE",
-                },
-            ]
-            
-            # 使用聊天会话发送消息并获取流式响应
-            response = self.chat.send_message(
-                prompt,
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                stream=True
-            )
-            
-            # 收集并显示流式响应
-            full_response = []
-            current_sentence = []
-            
-            # 创建一个 Live 上下文用于动态更新 Markdown
-            from rich.live import Live
-            from rich.markdown import Markdown
-            from rich.console import Console
-            
-            console = Console()
-            console.print("\nJarvis:")
-            
-            with Live(console=console, refresh_per_second=4) as live:
-                for chunk in response:
-                    if chunk.text:
-                        full_response.append(chunk.text)
-                        current_sentence.append(chunk.text)
-                        
-                        # 检查是否有完整的句子
-                        current_text = ''.join(current_sentence)
-                        sentences = self._split_into_sentences(current_text)
-                        
-                        if len(sentences) > 1:  # 有完整的句子
-                            # 保留最后一个不完整的句子
-                            current_sentence = [sentences[-1]]
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                logger.debug(f"向Gemini发送请求: {prompt}")
+                
+                generation_config = {
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "top_k": 40,
+                    "max_output_tokens": 2048,
+                }
+                
+                safety_settings = [
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_NONE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_NONE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE",
+                    },
+                ]
+                
+                # 使用聊天会话发送消息并获取流式响应
+                response = self.chat.send_message(
+                    prompt,
+                    generation_config=generation_config,
+                    safety_settings=safety_settings,
+                    stream=True
+                )
+                
+                # 收集并显示流式响应
+                full_response = []
+                current_sentence = []
+                
+                # 创建一个 Live 上下文用于动态更新 Markdown
+                from rich.live import Live
+                from rich.markdown import Markdown
+                from rich.console import Console
+                
+                console = Console()
+                console.print("\nJarvis:")
+                
+                with Live(console=console, refresh_per_second=4) as live:
+                    for chunk in response:
+                        if chunk.text:
+                            full_response.append(chunk.text)
+                            current_sentence.append(chunk.text)
                             
-                            # 对完整的句子进行语音合成
-                            if self.tts_callback:
-                                for sentence in sentences[:-1]:
-                                    self.tts_callback(sentence)
-                        
-                        # 实时更新 Markdown 渲染
-                        current_response = "".join(full_response)
-                        live.update(Markdown(current_response))
-            
-            # 处理最后一个句子
-            if current_sentence and self.tts_callback:
-                last_sentence = ''.join(current_sentence)
-                if last_sentence.strip():
-                    self.tts_callback(last_sentence)
-            
-            # 合并所有响应
-            result = "".join(full_response).strip()
-            logger.debug(f"Gemini响应: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Gemini API调用失败: {str(e)}")
-            raise 
+                            # 检查是否有完整的句子
+                            current_text = ''.join(current_sentence)
+                            sentences = self._split_into_sentences(current_text)
+                            
+                            if len(sentences) > 1:  # 有完整的句子
+                                # 保留最后一个不完整的句子
+                                current_sentence = [sentences[-1]]
+                                
+                                # 对完整的句子进行语音合成
+                                if self.tts_callback:
+                                    for sentence in sentences[:-1]:
+                                        self.tts_callback(sentence)
+                            
+                            # 实时更新 Markdown 渲染
+                            current_response = "".join(full_response)
+                            live.update(Markdown(current_response))
+                
+                # 处理最后一个句子
+                if current_sentence and self.tts_callback:
+                    last_sentence = ''.join(current_sentence)
+                    if last_sentence.strip():
+                        self.tts_callback(last_sentence)
+                
+                # 合并所有响应
+                result = "".join(full_response).strip()
+                logger.debug(f"Gemini响应: {result}")
+                return result
+                
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Gemini API调用失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
+                
+                if "Unable to build a coherent chat history" in str(e):
+                    # 重置聊天会话
+                    self.reset_chat()
+                    logger.info("检测到聊天历史问题，已重置会话")
+                    continue
+                    
+                if retry_count >= max_retries:
+                    error_msg = "抱歉，AI响应出现问题。我已重置对话，请重新输入您的问题。"
+                    logger.error(f"达到最大重试次数: {str(e)}")
+                    return error_msg
+                    
+            # 短暂延迟后重试
+            import time
+            time.sleep(1) 
