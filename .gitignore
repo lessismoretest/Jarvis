@@ -48,4 +48,7 @@ local_settings.py
 # 临时文件
 temp/
 *.wav
-*.mp3 
+*.mp3
+
+# AI生成的图片
+outputs/images/ 
